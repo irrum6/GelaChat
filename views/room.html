@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gela - Socket IO Chat</title>
+    <style>
+        body {
+            margin: 0;
+            padding-bottom: 3rem;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        #form {
+            background: rgba(0, 0, 0, 0.15);
+            padding: 0.25rem;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            display: flex;
+            height: 3rem;
+            box-sizing: border-box;
+        }
+
+        #input {
+            border: none;
+            padding: 0 1rem;
+            flex-grow: 1;
+            border-radius: 2rem;
+            margin: 0.25rem;
+        }
+
+        #input:focus {
+            outline: none;
+        }
+
+        #form>button {
+            background: #333;
+            border: none;
+            padding: 0 1rem;
+            margin: 0.25rem;
+            border-radius: 3px;
+            outline: none;
+            color: #fff;
+        }
+
+        #form>button.clr {
+            background: #933;
+        }
+
+        #messages {
+            list-style-type: none;
+            margin: 0;
+            padding: 0;
+        }
+
+        #messages>li {
+            padding: 0.5rem 1rem;
+        }
+
+        #messages>li:nth-child(odd) {
+            background: #ff8048;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>GELA</h1>
+    <ul id="messages"></ul>
+    <div style="visibility: hidden;"><span class="typer"></span> is typing</div>
+    <form id="form" action="">
+        <input id="input" autocomplete="off" />
+        <button>Send</button>
+        <button class="clr" id="clear">Clear</button>
+        <button class="clr" id="clrs">CLRS</button>
+    </form>
+    <!-- <script src="https://unpkg.com/vue@next"></script> -->
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const on = "addEventListener";
+        const off = "removeEventListener";
+
+
+        const _gid = id => document.getElementById(id);
+        const g = id => document.getElementById(id);
+
+        const _q = s => document.body.querySelector(s);
+        const q = s => document.body.querySelector(s);
+        const qa = s => document.body.querySelector(s);
+
+        let roomid = window.location.hash.replace("#", "");
+        // window.location.hash = "";
+
+        let pass = window.location.search.replace("?pass=", "");
+        //window.location.search = "";
+
+        let socket = io();
+
+        const _name = Array.prototype.map.call(window.crypto.getRandomValues(new Uint16Array(2)), (e) => e.toString(36)).join("a");
+        const name = _name.replace(/[0-9]/gi, "")
+
+        let messages = _gid('messages');
+        let form = _gid('form');
+        let input = _gid('input');
+        let clearer = _gid("clear");
+
+        const clear_chat = () => messages.innerHTML = '';
+
+        let onkey = (e) => {
+            // e.preventDefault();
+            socket.emit('typing', name);
+        };
+
+        input[on]('focus', (e) => {
+            e.preventDefault();
+            socket.emit('typing', name);
+            input[on]('keydown', onkey);
+        });
+
+        input[on]('blur', () => {
+            // e.preventDefault();
+            input[off]('keydown', onkey);
+        });
+
+        form[on]('submit', (e) => {
+            e.preventDefault();
+            if (input.value) {
+                socket.emit('schat', roomid, { msg: input.value, name });
+                input.value = '';
+            }
+        });
+
+        clearer[on]('click', clear_chat);
+
+        // clear chat to everyone
+        _gid("clrs")[on]('click', () => {
+            socket.emit("clrs", roomid, { msg: input.value, name });
+        });
+
+        socket.on("schat", (_msg) => {
+            let msg = document.createElement("li");
+            msg.textContent = `${_msg.name}:${_msg.msg}`;
+            messages.appendChild(msg);
+            window.scrollTo(0, document.body.scrollHeight);
+        });
+        socket.on("typing", (name) => {
+            const typer = _q(".typer");
+            typer.textContent = name;
+            typer.parentElement.style.visibility = 'visible';
+            const tim = setTimeout(() => {
+                typer.parentElement.style.visibility = 'hidden';
+                clearTimeout(tim);
+            }, 1000);
+        });
+        socket.on('connection', () => {
+            //socket.emit("connected", name);            
+        });
+        socket.on('connected', (name) => {
+            let msg = document.createElement("span");
+            msg.textContent = `${name} connected`;
+            document.body.appendChild(msg);
+        });
+
+        socket.on('clrs', () => {
+            messages.innerHTML = '';
+        });
+        socket.emit("join", { roomid, pass });
+    </script>
+</body>
+
+</html>
