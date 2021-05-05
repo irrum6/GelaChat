@@ -11,14 +11,20 @@ const crypto = require("crypto");
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
+
+const te = require("./tengine");
+te.setViewsDirectory("views", true);
+
 const rooms = new Map();
 
 app.get("/", (req, res) => {
-    res.sendFile(`${__dirname}/index.html`);
+    te.render(req, res,"index");
+    // res.sendFile(`${__dirname}/index.html`);
 });
 
 app.get("/getcha", (req, res) => {
-    res.sendFile(`${__dirname}/getcha.html`);
+    te.render(req, res,"getcha");
+    // res.sendFile(`${__dirname}/getcha.html`);
 });
 
 app.get("/room/:id", (req, res) => {
@@ -29,27 +35,33 @@ app.get("/room/:id", (req, res) => {
     let wrong = false;
     // compare passwords
     if (!rooms.has(req.params.id)) {
-        res.sendFile(`${__dirname}/views/404.html`);
+        res.redirect("/404");        
         return;
     }
 
     let ro = rooms.get(id);
 
     if (ro.pass !== pass) {
-        res.sendFile(`${__dirname}/views/wrong.html`);
+        te.render(req, res,"wrong");
+        // res.sendFile(`${__dirname}/views/wrong.html`);
         return;
     }
-
-    res.sendFile(`${__dirname}/views/room.html`);
+    te.render(req, res,"room");
+    // res.sendFile(`${__dirname}/views/room.html`);
 });
 
 app.get("/create", (req, res) => {
-    res.sendFile(`${__dirname}/views/create.html`);
+    let { not } = req.query;
+    if (not === "1") {
+        res.sendFile(`${__dirname}/views/create.html`);
+        return;
+    }
+    te.render(req, res, "create");
+
 });
 
 app.post("/create", (req, res) => {
     let { name, pass } = req.body;
-    // console.log(name, pass);
 
     const room = { name, pass };
     let n = crypto.randomInt(0, 65536);
@@ -64,6 +76,15 @@ app.post("/create", (req, res) => {
 
     res.redirect(url);
 });
+
+app.get("/404", (req, res) => {
+    te.render(req,res,"404");
+    // res.sendFile(`${__dirname}/views/404.html`);
+});
+
+app.get("*", (req, res) => {
+    te.default(req, res);
+})
 
 io.on("connection", (socket) => {
     console.log("An user connected");
@@ -82,9 +103,9 @@ io.on("connection", (socket) => {
         io.emit("connected", name);
     });
 
-    socket.on("join", ({roomid, pass}) => {
+    socket.on("join", ({ roomid, pass }) => {
         let ro = rooms.get(roomid);
-        console.log(Date.now(),roomid, pass);
+        console.log(Date.now(), roomid, pass);
         // record atempt
         if (ro.pass == pass) {
             socket.join(roomid);
@@ -97,10 +118,10 @@ io.on("connection", (socket) => {
     });
 
     // secure room posting
-    socket.on("schat", (room,{ msg, name }) => {
+    socket.on("schat", (room, { msg, name }) => {
         io.to(room).emit('schat', { msg, name });
     });
-    socket.on('clrs', (room,{ msg, name }) => {
+    socket.on('clrs', (room, { msg, name }) => {
         io.to(room).emit('clrs', { msg, name });
     });
 });
